@@ -564,10 +564,10 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--color-border-tertiary)", gap: 8, background: "var(--color-background-primary)", position: "sticky", top: 56, zIndex: 9 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: certColor, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>← Back</button>
-        <h2 style={{ color: "var(--color-text-primary)", fontSize: 15, margin: 0, flex: 1, textAlign: "center" }}>{topic.name}</h2>
-        <div style={{ width: 60 }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0 12px", gap: 8 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: certColor, cursor: "pointer", fontSize: 14, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4 }}>← Back to topics</button>
+        <h2 style={{ color: "var(--color-text-primary)", fontSize: 16, margin: 0, flex: 1, textAlign: "center" }}>{topic.name}</h2>
+        <div style={{ width: 100 }} />
       </div>
 
       <div style={{ display: "flex", gap: 6, padding: "12px 16px", borderBottom: "1px solid var(--color-border-tertiary)", flexWrap: "wrap" }}>
@@ -925,16 +925,16 @@ export default function App() {
     const live = data.certs.find(c => c.id === selectedCert.id) || selectedCert;
     return (
       <div style={{ minHeight: "100vh", background: "var(--color-background-primary)" }}>
-        {/* Top nav */}
-        <div style={{ borderBottom: "1px solid var(--color-border-tertiary)", padding: "0 32px", display: "flex", alignItems: "center", height: 56, background: "var(--color-background-primary)", position: "sticky", top: 0, zIndex: 10 }}>
-          <button onClick={() => setSelectedCert(null)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit", color: "var(--color-text-secondary)", fontSize: 14 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: "#FF9900" }}>G</span>
-            <span style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: 15 }}>GrowthDesk</span>
+        {/* Single sticky nav — contains everything */}
+        <div style={{ borderBottom: "1px solid var(--color-border-tertiary)", padding: "0 24px", display: "flex", alignItems: "center", height: 56, background: "var(--color-background-primary)", position: "sticky", top: 0, zIndex: 10 }}>
+          <button onClick={() => setSelectedCert(null)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit", color: "#FF9900", fontSize: 14, fontWeight: 600, marginRight: 12 }}>
+            ← GrowthDesk
           </button>
-          <span style={{ margin: "0 10px", color: "var(--color-text-secondary)" }}>›</span>
-          <span style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>{live.title}</span>
+          <span style={{ color: "var(--color-text-secondary)", marginRight: 8 }}>›</span>
+          <span style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 500 }}>{live.title}</span>
         </div>
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px 60px" }}>
+        {/* Scrollable content below nav */}
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px 80px" }}>
           <CertView cert={live} onBack={() => setSelectedCert(null)} onUpdate={updateCert} />
         </div>
       </div>

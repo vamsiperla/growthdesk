@@ -8,8 +8,10 @@ const GIST_FILENAME = "growthdesk-data.json";
 
 const isEditMode = () => {
   try {
+    if (!EDIT_SECRET || EDIT_SECRET === "") return false;
     const val = new URLSearchParams(window.location.search).get("edit");
-    return EDIT_SECRET !== "" && val === EDIT_SECRET;
+    if (!val || val === "") return false;
+    return val === EDIT_SECRET;
   } catch { return false; }
 };
 

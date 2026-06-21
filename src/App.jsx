@@ -1,6 +1,41 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const STORAGE_KEY = "growthdesk_v1";
+const GIST_ID = typeof window !== "undefined" && window.__GD_GIST_ID__ ? window.__GD_GIST_ID__ : "";
+const GIST_TOKEN = typeof window !== "undefined" && window.__GD_GIST_TOKEN__ ? window.__GD_GIST_TOKEN__ : "";
+const EDIT_SECRET = typeof window !== "undefined" && window.__GD_EDIT_SECRET__ ? window.__GD_EDIT_SECRET__ : "";
+const GIST_FILENAME = "growthdesk-data.json";
+
+// Check if edit mode is enabled via URL param
+const isEditMode = () => new URLSearchParams(window.location.search).get("edit") === EDIT_SECRET;
+
+// Fetch data from Gist
+const fetchFromGist = async () => {
+  try {
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      headers: { Authorization: `token ${GIST_TOKEN}` }
+    });
+    const json = await res.json();
+    const content = json.files?.[GIST_FILENAME]?.content;
+    return content ? JSON.parse(content) : null;
+  } catch { return null; }
+};
+
+// Save data to Gist
+const saveToGist = async (data) => {
+  try {
+    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `token ${GIST_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        files: { [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) } }
+      })
+    });
+  } catch (e) { console.error("Gist save failed", e); }
+};
 
 const defaultData = {
   certs: [
@@ -213,17 +248,41 @@ const ICONS = ["☁️","🤖","🏗️","🔐","📊","🌐","🗄️","⚡","�
 
 function useData() {
   const [data, setData] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState(null);
+
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      setData(saved ? JSON.parse(saved) : defaultData);
-    } catch { setData(defaultData); }
+    (async () => {
+      setSyncing(true);
+      // Always try Gist first (source of truth)
+      const gistData = await fetchFromGist();
+      if (gistData) {
+        setData(gistData);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(gistData));
+      } else {
+        // Fall back to localStorage
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          setData(saved ? JSON.parse(saved) : defaultData);
+        } catch { setData(defaultData); }
+      }
+      setSyncing(false);
+      setLastSynced(new Date());
+    })();
   }, []);
-  const save = (newData) => {
+
+  const save = async (newData) => {
     setData(newData);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(newData)); } catch {}
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+    if (isEditMode()) {
+      setSyncing(true);
+      await saveToGist(newData);
+      setSyncing(false);
+      setLastSynced(new Date());
+    }
   };
-  return [data, save];
+
+  return [data, save, syncing, lastSynced];
 }
 
 // ── Rich Text Styles ───────────────────────────────────────────
@@ -548,7 +607,7 @@ function QuizEditor({ initial, onSave, onCancel }) {
 }
 
 // ── Topic View ─────────────────────────────────────────────────
-function TopicView({ topic, certColor, onBack, onUpdate }) {
+function TopicView({ topic, certColor, onBack, onUpdate, editMode }) {
   const [tab, setTab] = useState("notes");
   const [addingNote, setAddingNote] = useState(false);
   const [addingMM, setAddingMM] = useState(false);
@@ -595,7 +654,7 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
           <div>
             {topic.notes.map((n, i) => (
               <div key={i} style={{ marginBottom: 10 }}>
-                {editingNoteIdx === i ? (
+                {editMode && editingNoteIdx === i ? (
                   <div>
                     <RichEditor value={editNoteVal} onChange={setEditNoteVal} placeholder="Edit your note..." />
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
@@ -607,16 +666,18 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
                   <div style={{ borderLeft: `3px solid ${certColor}`, background: "var(--color-background-secondary)", borderRadius: "0 8px 8px 0", padding: "10px 12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                       <NoteContent html={n} />
-                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                        <button onClick={() => { setEditingNoteIdx(i); setEditNoteVal(n); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>✏️</button>
-                        <button onClick={() => update({ notes: topic.notes.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
-                      </div>
+                      {editMode && (
+                        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                          <button onClick={() => { setEditingNoteIdx(i); setEditNoteVal(n); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => update({ notes: topic.notes.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
             ))}
-            {addingNote ? (
+            {editMode && (addingNote ? (
               <div style={{ marginTop: 10 }}>
                 <RichEditor value={newNote} onChange={setNewNote} placeholder="Write your note — use toolbar to format..." />
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
@@ -626,7 +687,7 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
               </div>
             ) : (
               <button onClick={() => setAddingNote(true)} style={{ marginTop: 10, width: "100%", padding: "10px", borderRadius: 8, border: `1px dashed ${certColor}`, background: "transparent", color: certColor, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>+ Add note</button>
-            )}
+            ))}
           </div>
         )}
 
@@ -635,7 +696,7 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
           <div>
             {topic.mentalModels.map((m, i) => (
               <div key={i} style={{ marginBottom: 10 }}>
-                {editingMMIdx === i ? (
+                {editMode && editingMMIdx === i ? (
                   <div>
                     <RichEditor value={editMMVal} onChange={setEditMMVal} placeholder="Describe your mental model..." />
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
@@ -646,17 +707,19 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
                 ) : (
                   <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "12px 14px", border: `1px solid var(--color-border-tertiary)`, borderLeft: `3px solid ${certColor}`, borderRadius: 10, background: "var(--color-background-secondary)" }}>
                     <div style={{ flex: 1 }}><NoteContent html={m} /></div>
-                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                      <button onClick={() => { setEditingMMIdx(i); setEditMMVal(m); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>✏️</button>
-                      <button onClick={() => update({ mentalModels: topic.mentalModels.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
-                    </div>
+                    {editMode && (
+                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                        <button onClick={() => { setEditingMMIdx(i); setEditMMVal(m); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>✏️</button>
+                        <button onClick={() => update({ mentalModels: topic.mentalModels.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             ))}
-            {addingMM ? (
+            {editMode && (addingMM ? (
               <div style={{ marginTop: 10 }}>
-                <RichEditor value={newMM} onChange={setNewMM} placeholder="e.g. 🧠 Think of X as Y — use formatting to make it memorable..." />
+                <RichEditor value={newMM} onChange={setNewMM} placeholder="e.g. 🧠 Think of X as Y..." />
                 <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                   <Btn variant="primary" color={certColor} onClick={() => { if (newMM.trim()) { update({ mentalModels: [...topic.mentalModels, newMM] }); setNewMM(""); setAddingMM(false); } }}>Add</Btn>
                   <Btn onClick={() => { setAddingMM(false); setNewMM(""); }}>Cancel</Btn>
@@ -664,14 +727,14 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
               </div>
             ) : (
               <button onClick={() => setAddingMM(true)} style={{ marginTop: 10, width: "100%", padding: "10px", borderRadius: 8, border: `1px dashed ${certColor}`, background: "transparent", color: certColor, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>+ Add mental model</button>
-            )}
+            ))}
           </div>
         )}
 
         {/* QUIZ TAB */}
         {tab === "quiz" && (
           <div>
-            {addingQuiz || editingQuizIdx !== null ? (
+            {editMode && (addingQuiz || editingQuizIdx !== null) ? (
               <QuizEditor
                 initial={editingQuizIdx !== null ? topic.quiz[editingQuizIdx] : null}
                 onSave={(q) => {
@@ -683,24 +746,26 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
             ) : (
               <>
                 {topic.quiz.length > 0 && <div style={{ marginBottom: 12 }}><QuizMode questions={topic.quiz} onBack={() => {}} /></div>}
-                <div style={{ borderTop: topic.quiz.length > 0 ? "1px solid var(--color-border-tertiary)" : "none", paddingTop: topic.quiz.length > 0 ? 12 : 0 }}>
-                  <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>MANAGE QUESTIONS</p>
-                  {topic.quiz.map((q, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", border: "1px solid var(--color-border-tertiary)", borderRadius: 8, marginBottom: 6 }}>
-                      <div style={{ flex: 1, marginRight: 8 }}>
-                        <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 10, background: q.type === "explain" ? "#E8F0FE" : q.type === "multi" ? "#F3E5F5" : "#FFF3E0", color: q.type === "explain" ? "#1A73E8" : q.type === "multi" ? "#7B2D8B" : "#FF9900", fontWeight: 500, marginRight: 6 }}>
-                          {q.type === "explain" ? "📖" : q.type === "multi" ? "☑️" : "🔘"}
-                        </span>
-                        <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{q.q.replace(/<[^>]*>/g, "").slice(0, 80)}{q.q.replace(/<[^>]*>/g, "").length > 80 ? "..." : ""}</span>
+                {editMode && (
+                  <div style={{ borderTop: topic.quiz.length > 0 ? "1px solid var(--color-border-tertiary)" : "none", paddingTop: topic.quiz.length > 0 ? 12 : 0 }}>
+                    <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>MANAGE QUESTIONS</p>
+                    {topic.quiz.map((q, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", border: "1px solid var(--color-border-tertiary)", borderRadius: 8, marginBottom: 6 }}>
+                        <div style={{ flex: 1, marginRight: 8 }}>
+                          <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 10, background: q.type === "explain" ? "#E8F0FE" : q.type === "multi" ? "#F3E5F5" : "#FFF3E0", color: q.type === "explain" ? "#1A73E8" : q.type === "multi" ? "#7B2D8B" : "#FF9900", fontWeight: 500, marginRight: 6 }}>
+                            {q.type === "explain" ? "📖" : q.type === "multi" ? "☑️" : "🔘"}
+                          </span>
+                          <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{q.q.replace(/<[^>]*>/g, "").slice(0, 80)}{q.q.replace(/<[^>]*>/g, "").length > 80 ? "..." : ""}</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                          <button onClick={() => setEditingQuizIdx(i)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>✏️</button>
+                          <button onClick={() => update({ quiz: topic.quiz.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                        <button onClick={() => setEditingQuizIdx(i)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>✏️</button>
-                        <button onClick={() => update({ quiz: topic.quiz.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
-                      </div>
-                    </div>
-                  ))}
-                  <button onClick={() => setAddingQuiz(true)} style={{ marginTop: 8, width: "100%", padding: "10px", borderRadius: 8, border: `1px dashed ${certColor}`, background: "transparent", color: certColor, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>+ Add quiz question</button>
-                </div>
+                    ))}
+                    <button onClick={() => setAddingQuiz(true)} style={{ marginTop: 8, width: "100%", padding: "10px", borderRadius: 8, border: `1px dashed ${certColor}`, background: "transparent", color: certColor, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>+ Add quiz question</button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -712,10 +777,10 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
             {topic.refs.map((r, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", border: "1px solid var(--color-border-tertiary)", borderRadius: 8, marginBottom: 8 }}>
                 <a href={r.url} target="_blank" rel="noreferrer" style={{ color: certColor, fontSize: 14, flex: 1, textDecoration: "none" }}>🔗 {r.label}</a>
-                <button onClick={() => update({ refs: topic.refs.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
+                {editMode && <button onClick={() => update({ refs: topic.refs.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>}
               </div>
             ))}
-            {addingRef ? (
+            {editMode && (addingRef ? (
               <div style={{ border: "1px solid var(--color-border-tertiary)", borderRadius: 10, padding: 12, marginTop: 8 }}>
                 <Input value={newRef.label} onChange={v => setNewRef(r => ({ ...r, label: v }))} placeholder="Label (e.g. AWS S3 Documentation)" style={{ marginBottom: 8 }} />
                 <Input value={newRef.url} onChange={v => setNewRef(r => ({ ...r, url: v }))} placeholder="URL (https://...)" style={{ marginBottom: 8 }} />
@@ -726,7 +791,7 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
               </div>
             ) : (
               <button onClick={() => setAddingRef(true)} style={{ marginTop: 8, width: "100%", padding: "10px", borderRadius: 8, border: `1px dashed ${certColor}`, background: "transparent", color: certColor, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>+ Add reference</button>
-            )}
+            ))}
           </div>
         )}
       </div>
@@ -735,7 +800,7 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
 }
 
 // ── Cert View ──────────────────────────────────────────────────
-function CertView({ cert, onBack, onUpdate }) {
+function CertView({ cert, onBack, onUpdate, editMode }) {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [selectedDomainId, setSelectedDomainId] = useState(null);
   const [addingDomain, setAddingDomain] = useState(false);
@@ -754,6 +819,7 @@ function CertView({ cert, onBack, onUpdate }) {
         certColor={cert.color}
         onBack={() => setSelectedTopic(null)}
         onUpdate={(updated) => { updateTopic(selectedDomainId, updated); setSelectedTopic(updated); }}
+        editMode={editMode}
       />
     );
   }
@@ -780,10 +846,12 @@ function CertView({ cert, onBack, onUpdate }) {
                 <h3 style={{ color: "var(--color-text-primary)", fontSize: 14, margin: 0 }}>{domain.name}</h3>
                 {domain.weight && <Tag color={cert.color}>{domain.weight}</Tag>}
               </div>
-              <div style={{ display: "flex", gap: 4 }}>
-                <button onClick={() => setAddingTopicFor(domain.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: cert.color, fontFamily: "inherit" }}>+ Topic</button>
-                <button onClick={() => onUpdate({ ...cert, domains: cert.domains.filter(d => d.id !== domain.id) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>🗑️</button>
-              </div>
+              {editMode && (
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={() => setAddingTopicFor(domain.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: cert.color, fontFamily: "inherit" }}>+ Topic</button>
+                  <button onClick={() => onUpdate({ ...cert, domains: cert.domains.filter(d => d.id !== domain.id) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>🗑️</button>
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {domain.topics.map(topic => (
@@ -795,10 +863,10 @@ function CertView({ cert, onBack, onUpdate }) {
                     </div>
                     <span style={{ color: cert.color, fontSize: 18 }}>›</span>
                   </button>
-                  <button onClick={() => onUpdate({ ...cert, domains: cert.domains.map(d => d.id !== domain.id ? d : { ...d, topics: d.topics.filter(t => t.id !== topic.id) }) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: 4 }}>🗑️</button>
+                  {editMode && <button onClick={() => onUpdate({ ...cert, domains: cert.domains.map(d => d.id !== domain.id ? d : { ...d, topics: d.topics.filter(t => t.id !== topic.id) }) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: 4 }}>🗑️</button>}
                 </div>
               ))}
-              {addingTopicFor === domain.id && (
+              {editMode && addingTopicFor === domain.id && (
                 <div style={{ padding: "10px 12px", border: "1px solid var(--color-border-tertiary)", borderRadius: 8, background: "var(--color-background-secondary)" }}>
                   <Input value={newTopic} onChange={setNewTopic} placeholder="Topic name..." style={{ marginBottom: 8 }} />
                   <div style={{ display: "flex", gap: 6 }}>
@@ -811,7 +879,7 @@ function CertView({ cert, onBack, onUpdate }) {
           </div>
         ))}
 
-        {addingDomain ? (
+        {editMode && (addingDomain ? (
           <div style={{ padding: "12px 14px", border: `1px dashed ${cert.color}`, borderRadius: 10, marginTop: 16 }}>
             <Input value={newDomain.name} onChange={v => setNewDomain(d => ({ ...d, name: v }))} placeholder="Domain name..." style={{ marginBottom: 8 }} />
             <Input value={newDomain.weight} onChange={v => setNewDomain(d => ({ ...d, weight: v }))} placeholder="Exam weight e.g. 20% (optional)" style={{ marginBottom: 8 }} />
@@ -822,7 +890,7 @@ function CertView({ cert, onBack, onUpdate }) {
           </div>
         ) : (
           <button onClick={() => setAddingDomain(true)} style={{ width: "100%", padding: "10px", borderRadius: 8, border: `1px dashed ${cert.color}`, background: "transparent", color: cert.color, cursor: "pointer", fontSize: 13, marginTop: 8, fontFamily: "inherit" }}>+ Add domain</button>
-        )}
+        ))}
       </div>
     </div>
   );

@@ -564,7 +564,7 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--color-border-tertiary)", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--color-border-tertiary)", gap: 8, background: "var(--color-background-primary)", position: "sticky", top: 56, zIndex: 9 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: certColor, cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>← Back</button>
         <h2 style={{ color: "var(--color-text-primary)", fontSize: 15, margin: 0, flex: 1, textAlign: "center" }}>{topic.name}</h2>
         <div style={{ width: 60 }} />
@@ -934,7 +934,7 @@ export default function App() {
           <span style={{ margin: "0 10px", color: "var(--color-text-secondary)" }}>›</span>
           <span style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>{live.title}</span>
         </div>
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px 60px" }}>
           <CertView cert={live} onBack={() => setSelectedCert(null)} onUpdate={updateCert} />
         </div>
       </div>

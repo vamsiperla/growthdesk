@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 
 const STORAGE_KEY = "growthdesk_v1";
-const GIST_ID = typeof window !== "undefined" && window.__GD_GIST_ID__ ? window.__GD_GIST_ID__ : "";
-const GIST_TOKEN = typeof window !== "undefined" && window.__GD_GIST_TOKEN__ ? window.__GD_GIST_TOKEN__ : "";
-const EDIT_SECRET = typeof window !== "undefined" && window.__GD_EDIT_SECRET__ ? window.__GD_EDIT_SECRET__ : "";
+// Environment variables — injected by Vite at build time
+const GIST_ID = "__VITE_GIST_ID__";
+const GIST_TOKEN = "__VITE_GIST_TOKEN__";
+const EDIT_SECRET = "__VITE_EDIT_SECRET__";
 const GIST_FILENAME = "growthdesk-data.json";
 
 const isEditMode = () => {

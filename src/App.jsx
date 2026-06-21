@@ -226,6 +226,36 @@ function useData() {
   return [data, save];
 }
 
+// ── Rich Text Styles ───────────────────────────────────────────
+const richTextCSS = `
+  .rich-editor, .rich-view {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--color-text-primary);
+    text-align: left;
+    font-family: inherit;
+  }
+  .rich-editor:empty:before { content: attr(data-placeholder); color: #888; pointer-events: none; }
+  .rich-editor { min-height: 140px; padding: 12px 14px; outline: none; }
+  .rich-view, .rich-editor {
+    word-break: break-word;
+  }
+  .rich-view h3, .rich-editor h3 { font-size: 17px; font-weight: 700; margin: 16px 0 6px; color: var(--color-text-primary); text-align: left; }
+  .rich-view h4, .rich-editor h4 { font-size: 15px; font-weight: 600; margin: 12px 0 4px; color: var(--color-text-primary); text-align: left; }
+  .rich-view p, .rich-editor p { margin: 6px 0; text-align: left; }
+  .rich-view ul, .rich-editor ul { list-style: disc; padding-left: 22px; margin: 6px 0; text-align: left; }
+  .rich-view ol, .rich-editor ol { list-style: decimal; padding-left: 22px; margin: 6px 0; text-align: left; }
+  .rich-view li, .rich-editor li { margin: 4px 0; padding-left: 4px; text-align: left; }
+  .rich-view ul ul, .rich-editor ul ul { list-style: circle; padding-left: 20px; margin: 2px 0; }
+  .rich-view ul ul ul, .rich-editor ul ul ul { list-style: square; padding-left: 20px; }
+  .rich-view strong, .rich-editor strong { font-weight: 700; }
+  .rich-view em, .rich-editor em { font-style: italic; }
+  .rich-view u, .rich-editor u { text-decoration: underline; }
+  .rich-view hr, .rich-editor hr { border: none; border-top: 1px solid var(--color-border-tertiary); margin: 12px 0; }
+  .rich-view blockquote, .rich-editor blockquote { border-left: 3px solid #FF9900; padding: 6px 12px; margin: 8px 0; background: var(--color-background-secondary); border-radius: 0 6px 6px 0; font-style: italic; }
+  .rich-view code, .rich-editor code { background: var(--color-background-secondary); padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; }
+`;
+
 // ── Rich Text Editor ───────────────────────────────────────────
 function RichEditor({ value, onChange, placeholder }) {
   const editorRef = useRef(null);
@@ -247,23 +277,25 @@ function RichEditor({ value, onChange, placeholder }) {
     { label: "B", cmd: "bold", style: { fontWeight: "bold" }, title: "Bold" },
     { label: "I", cmd: "italic", style: { fontStyle: "italic" }, title: "Italic" },
     { label: "U", cmd: "underline", style: { textDecoration: "underline" }, title: "Underline" },
-    { label: "H1", cmd: "formatBlock", val: "h3", title: "Heading" },
-    { label: "H2", cmd: "formatBlock", val: "h4", title: "Subheading" },
+    { label: "H1", cmd: "formatBlock", val: "h3", title: "Heading 1" },
+    { label: "H2", cmd: "formatBlock", val: "h4", title: "Heading 2" },
     { label: "¶", cmd: "formatBlock", val: "p", title: "Paragraph" },
+    { label: "❝", cmd: "formatBlock", val: "blockquote", title: "Quote" },
     { label: "• List", cmd: "insertUnorderedList", title: "Bullet list" },
     { label: "1. List", cmd: "insertOrderedList", title: "Numbered list" },
-    { label: "⇥", cmd: "indent", title: "Indent" },
-    { label: "⇤", cmd: "outdent", title: "Outdent" },
+    { label: "⇥ Indent", cmd: "indent", title: "Indent" },
+    { label: "⇤ Outdent", cmd: "outdent", title: "Outdent" },
     { label: "—", cmd: "insertHorizontalRule", title: "Divider" },
   ];
 
   return (
-    <div style={{ border: "1px solid var(--color-border-secondary)", borderRadius: 8, overflow: "hidden" }}>
+    <div style={{ border: "1px solid var(--color-border-secondary)", borderRadius: 10, overflow: "hidden" }}>
+      <style>{richTextCSS}</style>
       {/* Toolbar */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 2, padding: "6px 8px", background: "var(--color-background-secondary)", borderBottom: "1px solid var(--color-border-tertiary)" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, padding: "8px 10px", background: "var(--color-background-secondary)", borderBottom: "1px solid var(--color-border-tertiary)" }}>
         {tools.map((t, i) => (
           <button key={i} onMouseDown={e => { e.preventDefault(); exec(t.cmd, t.val || null); }} title={t.title}
-            style={{ ...t.style, padding: "3px 8px", borderRadius: 4, border: "1px solid var(--color-border-tertiary)", background: "var(--color-background-primary)", color: "var(--color-text-primary)", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+            style={{ ...t.style, padding: "4px 9px", borderRadius: 5, border: "1px solid var(--color-border-tertiary)", background: "var(--color-background-primary)", color: "var(--color-text-primary)", cursor: "pointer", fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}>
             {t.label}
           </button>
         ))}
@@ -275,22 +307,8 @@ function RichEditor({ value, onChange, placeholder }) {
         suppressContentEditableWarning
         onInput={() => onChange(editorRef.current?.innerHTML || "")}
         data-placeholder={placeholder}
-        style={{
-          minHeight: 120, padding: "10px 12px", outline: "none", fontSize: 14,
-          color: "var(--color-text-primary)", lineHeight: 1.7,
-          background: "var(--color-background-primary)",
-        }}
+        className="rich-editor"
       />
-      <style>{`
-        [contenteditable]:empty:before { content: attr(data-placeholder); color: #888; pointer-events: none; }
-        [contenteditable] h3 { font-size: 16px; font-weight: 700; margin: 8px 0 4px; }
-        [contenteditable] h4 { font-size: 14px; font-weight: 600; margin: 6px 0 3px; }
-        [contenteditable] ul { padding-left: 20px; margin: 4px 0; }
-        [contenteditable] ol { padding-left: 20px; margin: 4px 0; }
-        [contenteditable] li { margin: 2px 0; }
-        [contenteditable] p { margin: 4px 0; }
-        [contenteditable] hr { border: none; border-top: 1px solid var(--color-border-tertiary); margin: 8px 0; }
-      `}</style>
     </div>
   );
 }
@@ -298,7 +316,10 @@ function RichEditor({ value, onChange, placeholder }) {
 // ── Render rich HTML note ──────────────────────────────────────
 function NoteContent({ html }) {
   return (
-    <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text-primary)" }} />
+    <>
+      <style>{richTextCSS}</style>
+      <div className="rich-view" dangerouslySetInnerHTML={{ __html: html }} />
+    </>
   );
 }
 
@@ -358,7 +379,7 @@ function QuizMode({ questions, onBack }) {
       <div style={{ height: 3, background: "var(--color-background-secondary)", borderRadius: 2, marginBottom: 16 }}>
         <div style={{ height: 3, background: "#FF9900", borderRadius: 2, width: `${(cur / questions.length) * 100}%` }} />
       </div>
-      <p style={{ fontWeight: 500, fontSize: 15, color: "var(--color-text-primary)", marginBottom: 14 }}>{q.q}</p>
+      <div style={{ fontWeight: 500, fontSize: 15, color: "var(--color-text-primary)", marginBottom: 14 }}><NoteContent html={q.q} /></div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
         {q.options.map((opt, i) => {
           let bg = "var(--color-background-primary)", border = "1px solid var(--color-border-tertiary)", col = "var(--color-text-primary)";
@@ -369,7 +390,7 @@ function QuizMode({ questions, onBack }) {
           return <button key={i} onClick={() => { if (sel !== null) return; setSel(i); if (i === q.answer) setScore(s => s + 1); }} style={{ textAlign: "left", padding: "10px 14px", borderRadius: 8, border, background: bg, color: col, cursor: sel !== null ? "default" : "pointer", fontSize: 14, fontFamily: "inherit" }}>{String.fromCharCode(65 + i)}. {opt}</button>;
         })}
       </div>
-      {sel !== null && <div style={{ background: "var(--color-background-secondary)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "var(--color-text-secondary)" }}>💡 {q.explanation}</div>}
+      {sel !== null && <div style={{ background: "var(--color-background-secondary)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13 }}><NoteContent html={"💡 " + q.explanation} /></div>}
       {sel !== null && <button onClick={() => { if (cur + 1 >= questions.length) setDone(true); else { setCur(c => c + 1); setSel(null); } }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: "#FF9900", color: "#fff", fontSize: 15, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>{cur + 1 >= questions.length ? "See results" : "Next →"}</button>}
     </div>
   );
@@ -378,22 +399,34 @@ function QuizMode({ questions, onBack }) {
 function QuizEditor({ initial, onSave, onCancel }) {
   const blank = { q: "", options: ["", "", "", ""], answer: 0, explanation: "" };
   const [form, setForm] = useState(initial || blank);
-  const valid = form.q.trim() && form.options.every(o => o.trim()) && form.explanation.trim();
+  const [qHtml, setQHtml] = useState(initial?.q || "");
+  const [expHtml, setExpHtml] = useState(initial?.explanation || "");
+  const valid = qHtml.trim() && form.options.every(o => o.trim()) && expHtml.trim();
+
+  const handleSave = () => {
+    if (!valid) return;
+    onSave({ ...form, q: qHtml, explanation: expHtml });
+  };
+
   return (
     <div style={{ border: "1px solid var(--color-border-tertiary)", borderRadius: 10, padding: 14, marginBottom: 10 }}>
       <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>QUESTION</p>
-      <Input value={form.q} onChange={v => setForm(f => ({ ...f, q: v }))} placeholder="Enter question..." multiline rows={2} style={{ marginBottom: 10 }} />
-      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>OPTIONS</p>
+      <RichEditor value={qHtml} onChange={setQHtml} placeholder="Enter your question..." />
+
+      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6, marginTop: 14 }}>OPTIONS <span style={{ fontWeight: 400 }}>(select the correct answer)</span></p>
       {form.options.map((opt, i) => (
         <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-          <input type="radio" checked={form.answer === i} onChange={() => setForm(f => ({ ...f, answer: i }))} style={{ accentColor: "#FF9900" }} />
+          <input type="radio" checked={form.answer === i} onChange={() => setForm(f => ({ ...f, answer: i }))} style={{ accentColor: "#FF9900", flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: "var(--color-text-secondary)", minWidth: 20 }}>{String.fromCharCode(65 + i)}.</span>
           <Input value={opt} onChange={v => setForm(f => { const o = [...f.options]; o[i] = v; return { ...f, options: o }; })} placeholder={`Option ${String.fromCharCode(65 + i)}`} style={{ marginBottom: 0 }} />
         </div>
       ))}
-      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6, marginTop: 10 }}>EXPLANATION</p>
-      <Input value={form.explanation} onChange={v => setForm(f => ({ ...f, explanation: v }))} placeholder="Explain the correct answer..." multiline rows={2} style={{ marginBottom: 10 }} />
-      <div style={{ display: "flex", gap: 8 }}>
-        <Btn onClick={() => valid && onSave(form)} variant="primary" color="#FF9900" style={{ opacity: valid ? 1 : 0.5 }}>Save question</Btn>
+
+      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8, marginTop: 14 }}>EXPLANATION</p>
+      <RichEditor value={expHtml} onChange={setExpHtml} placeholder="Explain why the correct answer is right — use formatting for clarity..." />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <Btn onClick={handleSave} variant="primary" color="#FF9900" style={{ opacity: valid ? 1 : 0.5 }}>Save question</Btn>
         <Btn onClick={onCancel}>Cancel</Btn>
       </div>
     </div>
@@ -487,18 +520,18 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
         {tab === "mental" && (
           <div>
             {topic.mentalModels.map((m, i) => (
-              <div key={i} style={{ marginBottom: 8 }}>
+              <div key={i} style={{ marginBottom: 10 }}>
                 {editingMMIdx === i ? (
                   <div>
-                    <Input value={editMMVal} onChange={setEditMMVal} multiline rows={3} style={{ marginBottom: 6 }} />
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <RichEditor value={editMMVal} onChange={setEditMMVal} placeholder="Describe your mental model..." />
+                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                       <Btn variant="primary" color={certColor} onClick={() => { const mm = [...topic.mentalModels]; mm[i] = editMMVal; update({ mentalModels: mm }); setEditingMMIdx(null); }}>Save</Btn>
                       <Btn onClick={() => setEditingMMIdx(null)}>Cancel</Btn>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "12px 14px", border: "1px solid var(--color-border-tertiary)", borderRadius: 10 }}>
-                    <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-primary)", lineHeight: 1.7, flex: 1 }}>{m}</p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "12px 14px", border: `1px solid var(--color-border-tertiary)`, borderLeft: `3px solid ${certColor}`, borderRadius: 10, background: "var(--color-background-secondary)" }}>
+                    <div style={{ flex: 1 }}><NoteContent html={m} /></div>
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                       <button onClick={() => { setEditingMMIdx(i); setEditMMVal(m); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>✏️</button>
                       <button onClick={() => update({ mentalModels: topic.mentalModels.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
@@ -509,9 +542,9 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
             ))}
             {addingMM ? (
               <div style={{ marginTop: 10 }}>
-                <Input value={newMM} onChange={setNewMM} placeholder="e.g. 🧠 Think of X as Y..." multiline rows={3} style={{ marginBottom: 8 }} />
-                <div style={{ display: "flex", gap: 6 }}>
-                  <Btn variant="primary" color={certColor} onClick={() => { if (newMM.trim()) { update({ mentalModels: [...topic.mentalModels, newMM.trim()] }); setNewMM(""); setAddingMM(false); } }}>Add</Btn>
+                <RichEditor value={newMM} onChange={setNewMM} placeholder="e.g. 🧠 Think of X as Y — use formatting to make it memorable..." />
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <Btn variant="primary" color={certColor} onClick={() => { if (newMM.trim()) { update({ mentalModels: [...topic.mentalModels, newMM] }); setNewMM(""); setAddingMM(false); } }}>Add</Btn>
                   <Btn onClick={() => { setAddingMM(false); setNewMM(""); }}>Cancel</Btn>
                 </div>
               </div>

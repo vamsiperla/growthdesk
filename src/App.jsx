@@ -348,13 +348,14 @@ const Tag = ({ children, color }) => (
 // ── Quiz ───────────────────────────────────────────────────────
 function QuizMode({ questions, onBack }) {
   const [cur, setCur] = useState(0);
-  const [sel, setSel] = useState(null);
+  const [sel, setSel] = useState([]); // array for multi-select
+  const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
 
   if (!questions.length) return (
     <div style={{ textAlign: "center", padding: "2rem", color: "var(--color-text-secondary)" }}>
-      <p>No quiz questions yet.</p>
+      <p>No quiz questions yet. Add some below!</p>
     </div>
   );
 
@@ -363,13 +364,53 @@ function QuizMode({ questions, onBack }) {
       <div style={{ fontSize: 48, marginBottom: 8 }}>{score === questions.length ? "🏆" : score >= questions.length / 2 ? "👍" : "📚"}</div>
       <h3 style={{ color: "var(--color-text-primary)", marginBottom: 4 }}>Score: {score} / {questions.length}</h3>
       <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
-        <Btn onClick={() => { setCur(0); setSel(null); setScore(0); setDone(false); }}>Retry</Btn>
+        <Btn onClick={() => { setCur(0); setSel([]); setSubmitted(false); setScore(0); setDone(false); }}>Retry</Btn>
         <Btn onClick={onBack} variant="primary">← Back</Btn>
       </div>
     </div>
   );
 
   const q = questions[cur];
+  const isMulti = q.type === "multi";
+  const isExplain = q.type === "explain";
+  const correctAnswers = Array.isArray(q.answer) ? q.answer : [q.answer];
+
+  const toggleOption = (i) => {
+    if (submitted) return;
+    if (isMulti) {
+      setSel(s => s.includes(i) ? s.filter(x => x !== i) : [...s, i]);
+    } else {
+      setSel([i]);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (sel.length === 0 && !isExplain) return;
+    setSubmitted(true);
+    const isCorrect = isMulti
+      ? correctAnswers.length === sel.length && correctAnswers.every(a => sel.includes(a))
+      : sel[0] === correctAnswers[0];
+    if (isCorrect) setScore(s => s + 1);
+  };
+
+  const next = () => {
+    if (cur + 1 >= questions.length) setDone(true);
+    else { setCur(c => c + 1); setSel([]); setSubmitted(false); }
+  };
+
+  const getOptionStyle = (i) => {
+    const base = { textAlign: "left", padding: "10px 14px", borderRadius: 8, cursor: submitted ? "default" : "pointer", fontSize: 14, fontFamily: "inherit", width: "100%", marginBottom: 6 };
+    if (!submitted) {
+      const chosen = sel.includes(i);
+      return { ...base, background: chosen ? "rgba(255,153,0,0.1)" : "var(--color-background-primary)", border: `1px solid ${chosen ? "#FF9900" : "var(--color-border-tertiary)"}`, color: "var(--color-text-primary)" };
+    }
+    const isCorrect = correctAnswers.includes(i);
+    const isChosen = sel.includes(i);
+    if (isCorrect) return { ...base, background: "#E8F5E9", border: "1px solid #4CAF50", color: "#2E7D32" };
+    if (isChosen && !isCorrect) return { ...base, background: "#FFEBEE", border: "1px solid #E53935", color: "#C62828" };
+    return { ...base, background: "var(--color-background-primary)", border: "1px solid var(--color-border-tertiary)", color: "var(--color-text-primary)", opacity: 0.5 };
+  };
+
   return (
     <div style={{ padding: "1rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -379,51 +420,114 @@ function QuizMode({ questions, onBack }) {
       <div style={{ height: 3, background: "var(--color-background-secondary)", borderRadius: 2, marginBottom: 16 }}>
         <div style={{ height: 3, background: "#FF9900", borderRadius: 2, width: `${(cur / questions.length) * 100}%` }} />
       </div>
-      <div style={{ fontWeight: 500, fontSize: 15, color: "var(--color-text-primary)", marginBottom: 14 }}><NoteContent html={q.q} /></div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-        {q.options.map((opt, i) => {
-          let bg = "var(--color-background-primary)", border = "1px solid var(--color-border-tertiary)", col = "var(--color-text-primary)";
-          if (sel !== null) {
-            if (i === q.answer) { bg = "#E8F5E9"; border = "1px solid #4CAF50"; col = "#2E7D32"; }
-            else if (i === sel) { bg = "#FFEBEE"; border = "1px solid #E53935"; col = "#C62828"; }
-          }
-          return <button key={i} onClick={() => { if (sel !== null) return; setSel(i); if (i === q.answer) setScore(s => s + 1); }} style={{ textAlign: "left", padding: "10px 14px", borderRadius: 8, border, background: bg, color: col, cursor: sel !== null ? "default" : "pointer", fontSize: 14, fontFamily: "inherit" }}>{String.fromCharCode(65 + i)}. {opt}</button>;
-        })}
+
+      {/* Question type badge */}
+      <div style={{ marginBottom: 10 }}>
+        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: isExplain ? "#E8F0FE" : isMulti ? "#F3E5F5" : "#FFF3E0", color: isExplain ? "#1A73E8" : isMulti ? "#7B2D8B" : "#FF9900", fontWeight: 500 }}>
+          {isExplain ? "📖 Explanation" : isMulti ? "☑️ Multiple Select" : "🔘 Single Choice"}
+        </span>
       </div>
-      {sel !== null && <div style={{ background: "var(--color-background-secondary)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13 }}><NoteContent html={"💡 " + q.explanation} /></div>}
-      {sel !== null && <button onClick={() => { if (cur + 1 >= questions.length) setDone(true); else { setCur(c => c + 1); setSel(null); } }} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: "#FF9900", color: "#fff", fontSize: 15, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>{cur + 1 >= questions.length ? "See results" : "Next →"}</button>}
+
+      <div style={{ marginBottom: 14 }}><NoteContent html={q.q} /></div>
+
+      {!isExplain && (
+        <div style={{ marginBottom: 12 }}>
+          {isMulti && <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>Select all that apply</p>}
+          {q.options.map((opt, i) => (
+            <button key={i} onClick={() => toggleOption(i)} style={getOptionStyle(i)}>
+              <span style={{ marginRight: 8 }}>{isMulti ? (sel.includes(i) ? "☑" : "☐") : String.fromCharCode(65 + i) + "."}</span>
+              {opt}
+              {submitted && correctAnswers.includes(i) && <span style={{ marginLeft: 6 }}>✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Submit button */}
+      {!submitted && !isExplain && (
+        <button onClick={handleSubmit} disabled={sel.length === 0} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: sel.length > 0 ? "#FF9900" : "var(--color-background-secondary)", color: sel.length > 0 ? "#fff" : "var(--color-text-secondary)", fontSize: 14, cursor: sel.length > 0 ? "pointer" : "default", fontFamily: "inherit", fontWeight: 500, marginBottom: 10 }}>
+          Submit Answer
+        </button>
+      )}
+
+      {/* Explanation */}
+      {(submitted || isExplain) && q.explanation && (
+        <div style={{ background: "var(--color-background-secondary)", borderRadius: 8, padding: "12px 14px", marginBottom: 12, borderLeft: "3px solid #FF9900" }}>
+          <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: "#FF9900" }}>💡 EXPLANATION</p>
+          <NoteContent html={q.explanation} />
+        </div>
+      )}
+
+      {(submitted || isExplain) && (
+        <button onClick={next} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: "#FF9900", color: "#fff", fontSize: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
+          {cur + 1 >= questions.length ? "See results" : "Next →"}
+        </button>
+      )}
     </div>
   );
 }
 
 function QuizEditor({ initial, onSave, onCancel }) {
-  const blank = { q: "", options: ["", "", "", ""], answer: 0, explanation: "" };
+  const blank = { type: "single", q: "", options: ["", "", "", ""], answer: 0, explanation: "" };
   const [form, setForm] = useState(initial || blank);
   const [qHtml, setQHtml] = useState(initial?.q || "");
   const [expHtml, setExpHtml] = useState(initial?.explanation || "");
-  const valid = qHtml.trim() && form.options.every(o => o.trim()) && expHtml.trim();
+  const [multiAnswers, setMultiAnswers] = useState(
+    initial?.type === "multi" && Array.isArray(initial?.answer) ? initial.answer : []
+  );
+
+  const isExplain = form.type === "explain";
+  const isMulti = form.type === "multi";
+  const valid = qHtml.replace(/<[^>]*>/g, "").trim().length > 0;
 
   const handleSave = () => {
     if (!valid) return;
-    onSave({ ...form, q: qHtml, explanation: expHtml });
+    const answer = isMulti ? multiAnswers : isExplain ? null : form.answer;
+    onSave({ ...form, q: qHtml, explanation: expHtml, answer, type: form.type });
   };
 
   return (
     <div style={{ border: "1px solid var(--color-border-tertiary)", borderRadius: 10, padding: 14, marginBottom: 10 }}>
-      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>QUESTION</p>
-      <RichEditor value={qHtml} onChange={setQHtml} placeholder="Enter your question..." />
+      {/* Question type selector */}
+      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>QUESTION TYPE</p>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {[
+          { id: "single", label: "🔘 Single Choice" },
+          { id: "multi", label: "☑️ Multiple Select" },
+          { id: "explain", label: "📖 Explanation Only" },
+        ].map(t => (
+          <button key={t.id} onClick={() => setForm(f => ({ ...f, type: t.id }))} style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${form.type === t.id ? "#FF9900" : "var(--color-border-tertiary)"}`, background: form.type === t.id ? "#FFF3E0" : "transparent", color: form.type === t.id ? "#FF9900" : "var(--color-text-secondary)", cursor: "pointer", fontSize: 12, fontFamily: "inherit", fontWeight: form.type === t.id ? 600 : 400 }}>{t.label}</button>
+        ))}
+      </div>
 
-      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6, marginTop: 14 }}>OPTIONS <span style={{ fontWeight: 400 }}>(select the correct answer)</span></p>
-      {form.options.map((opt, i) => (
-        <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-          <input type="radio" checked={form.answer === i} onChange={() => setForm(f => ({ ...f, answer: i }))} style={{ accentColor: "#FF9900", flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: "var(--color-text-secondary)", minWidth: 20 }}>{String.fromCharCode(65 + i)}.</span>
-          <Input value={opt} onChange={v => setForm(f => { const o = [...f.options]; o[i] = v; return { ...f, options: o }; })} placeholder={`Option ${String.fromCharCode(65 + i)}`} style={{ marginBottom: 0 }} />
+      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>QUESTION / CONTENT</p>
+      <RichEditor value={qHtml} onChange={setQHtml} placeholder={isExplain ? "Write your explanation, concept, or study note here..." : "Enter your question..."} />
+
+      {/* Options — only for single/multi */}
+      {!isExplain && (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>
+            OPTIONS — <span style={{ fontWeight: 400 }}>{isMulti ? "check all correct answers" : "select the one correct answer"}</span>
+          </p>
+          {form.options.map((opt, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+              {isMulti ? (
+                <input type="checkbox" checked={multiAnswers.includes(i)} onChange={() => setMultiAnswers(a => a.includes(i) ? a.filter(x => x !== i) : [...a, i])} style={{ accentColor: "#FF9900", flexShrink: 0, width: 16, height: 16 }} />
+              ) : (
+                <input type="radio" checked={form.answer === i} onChange={() => setForm(f => ({ ...f, answer: i }))} style={{ accentColor: "#FF9900", flexShrink: 0 }} />
+              )}
+              <span style={{ fontSize: 13, color: "var(--color-text-secondary)", minWidth: 20 }}>{String.fromCharCode(65 + i)}.</span>
+              <Input value={opt} onChange={v => setForm(f => { const o = [...f.options]; o[i] = v; return { ...f, options: o }; })} placeholder={`Option ${String.fromCharCode(65 + i)}`} style={{ marginBottom: 0 }} />
+            </div>
+          ))}
         </div>
-      ))}
+      )}
 
-      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8, marginTop: 14 }}>EXPLANATION</p>
-      <RichEditor value={expHtml} onChange={setExpHtml} placeholder="Explain why the correct answer is right — use formatting for clarity..." />
+      {/* Explanation — optional */}
+      <div style={{ marginTop: 14 }}>
+        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>EXPLANATION <span style={{ fontWeight: 400, opacity: 0.7 }}>(optional)</span></p>
+        <RichEditor value={expHtml} onChange={setExpHtml} placeholder="Explain the answer or add extra context — optional..." />
+      </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <Btn onClick={handleSave} variant="primary" color="#FF9900" style={{ opacity: valid ? 1 : 0.5 }}>Save question</Btn>
@@ -573,8 +677,13 @@ function TopicView({ topic, certColor, onBack, onUpdate }) {
                   <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>MANAGE QUESTIONS</p>
                   {topic.quiz.map((q, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", border: "1px solid var(--color-border-tertiary)", borderRadius: 8, marginBottom: 6 }}>
-                      <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-primary)", flex: 1 }}>{q.q}</p>
-                      <div style={{ display: "flex", gap: 4 }}>
+                      <div style={{ flex: 1, marginRight: 8 }}>
+                        <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 10, background: q.type === "explain" ? "#E8F0FE" : q.type === "multi" ? "#F3E5F5" : "#FFF3E0", color: q.type === "explain" ? "#1A73E8" : q.type === "multi" ? "#7B2D8B" : "#FF9900", fontWeight: 500, marginRight: 6 }}>
+                          {q.type === "explain" ? "📖" : q.type === "multi" ? "☑️" : "🔘"}
+                        </span>
+                        <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{q.q.replace(/<[^>]*>/g, "").slice(0, 80)}{q.q.replace(/<[^>]*>/g, "").length > 80 ? "..." : ""}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                         <button onClick={() => setEditingQuizIdx(i)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>✏️</button>
                         <button onClick={() => update({ quiz: topic.quiz.filter((_, j) => j !== i) })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>🗑️</button>
                       </div>

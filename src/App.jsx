@@ -934,7 +934,7 @@ export default function App() {
           <span style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 500 }}>{live.title}</span>
         </div>
         {/* Scrollable content below nav */}
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px 80px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 48px 80px" }}>
           <CertView cert={live} onBack={() => setSelectedCert(null)} onUpdate={updateCert} />
         </div>
       </div>
@@ -990,7 +990,7 @@ export default function App() {
       </div>
 
       {/* Subject cards */}
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "40px 48px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--color-text-primary)", margin: 0 }}>Your Subjects</h2>
           <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>{data.certs.length} subject{data.certs.length !== 1 ? "s" : ""}</span>

@@ -373,7 +373,11 @@ function QuizMode({ questions, onBack }) {
   const q = questions[cur];
   const isMulti = q.type === "multi";
   const isExplain = q.type === "explain";
-  const correctAnswers = Array.isArray(q.answer) ? q.answer : [q.answer];
+  const correctAnswers = Array.isArray(q.answer)
+    ? q.answer.map(Number)
+    : q.answer !== null && q.answer !== undefined
+    ? [Number(q.answer)]
+    : [];
 
   const toggleOption = (i) => {
     if (submitted) return;
@@ -387,10 +391,13 @@ function QuizMode({ questions, onBack }) {
   const handleSubmit = () => {
     if (sel.length === 0 && !isExplain) return;
     setSubmitted(true);
-    const isCorrect = isMulti
-      ? correctAnswers.length === sel.length && correctAnswers.every(a => sel.includes(a))
-      : sel[0] === correctAnswers[0];
-    if (isCorrect) setScore(s => s + 1);
+    if (isMulti) {
+      const correct = [...correctAnswers].sort().join(",");
+      const chosen = [...sel].sort().join(",");
+      if (correct === chosen) setScore(s => s + 1);
+    } else {
+      if (sel[0] === correctAnswers[0]) setScore(s => s + 1);
+    }
   };
 
   const next = () => {
@@ -432,20 +439,19 @@ function QuizMode({ questions, onBack }) {
 
       {!isExplain && (
         <div style={{ marginBottom: 12 }}>
-          {isMulti && <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>Select all that apply</p>}
+          {isMulti && <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8, textAlign: "left" }}>Select all that apply</p>}
           {q.options.map((opt, i) => (
-            <button key={i} onClick={() => toggleOption(i)} style={getOptionStyle(i)}>
-              <span style={{ marginRight: 8 }}>{isMulti ? (sel.includes(i) ? "☑" : "☐") : String.fromCharCode(65 + i) + "."}</span>
-              {opt}
-              {submitted && correctAnswers.includes(i) && <span style={{ marginLeft: 6 }}>✓</span>}
+            <button key={i} onClick={() => toggleOption(i)} style={{ ...getOptionStyle(i), display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>{isMulti ? (sel.includes(i) ? "☑" : "☐") : String.fromCharCode(65 + i) + "."}</span>
+              <span style={{ textAlign: "left" }}>{opt}</span>
+              {submitted && correctAnswers.includes(i) && <span style={{ marginLeft: "auto", color: "#4CAF50" }}>✓</span>}
             </button>
           ))}
         </div>
       )}
 
-      {/* Submit button */}
       {!submitted && !isExplain && (
-        <button onClick={handleSubmit} disabled={sel.length === 0} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: sel.length > 0 ? "#FF9900" : "var(--color-background-secondary)", color: sel.length > 0 ? "#fff" : "var(--color-text-secondary)", fontSize: 14, cursor: sel.length > 0 ? "pointer" : "default", fontFamily: "inherit", fontWeight: 500, marginBottom: 10 }}>
+        <button onClick={handleSubmit} disabled={sel.length === 0} style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: sel.length > 0 ? "#FF9900" : "var(--color-background-secondary)", color: sel.length > 0 ? "#fff" : "var(--color-text-secondary)", fontSize: 14, cursor: sel.length > 0 ? "pointer" : "default", fontFamily: "inherit", fontWeight: 500, marginBottom: 10, textAlign: "center" }}>
           Submit Answer
         </button>
       )}
@@ -482,7 +488,11 @@ function QuizEditor({ initial, onSave, onCancel }) {
 
   const handleSave = () => {
     if (!valid) return;
-    const answer = isMulti ? multiAnswers : isExplain ? null : form.answer;
+    const answer = isMulti
+      ? multiAnswers.map(Number).sort()
+      : isExplain
+      ? null
+      : Number(form.answer);
     onSave({ ...form, q: qHtml, explanation: expHtml, answer, type: form.type });
   };
 

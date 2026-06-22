@@ -4,16 +4,15 @@ const STORAGE_KEY = "growthdesk_v1";
 const GIST_ID = "";
 const GIST_TOKEN = "";
 const EDIT_SECRET = "GROWTHDESK_EDIT";
-const GIST_FILENAME = "growthdesk-data.json";
 
 const isEditMode = () => {
   try {
-    if (!EDIT_SECRET || EDIT_SECRET === "") return false;
     const val = new URLSearchParams(window.location.search).get("edit");
-    if (!val || val === "") return false;
+    if (!val) return false;
     return val === EDIT_SECRET;
   } catch { return false; }
 };
+const GIST_FILENAME = "growthdesk-data.json";
 
 const fetchFromGist = async () => {
   if (!GIST_ID || !GIST_TOKEN) return null;
